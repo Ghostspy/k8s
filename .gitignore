@@ -17,4 +17,6 @@ bind9/configs/var/named/data/named.run
 bind9/configs/var/named/data/named.run-*
 
 # istioctl
-istio-1.28.1/
+istio-*/bin/istioctl
+istio-*/
+
