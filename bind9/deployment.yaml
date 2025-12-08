@@ -1,0 +1,78 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: bind9
+  namespace: bind9
+  labels:
+    app: bind9
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: bind9
+  template:
+    metadata:
+      labels:
+        app: bind9
+    spec:
+      securityContext:
+        fsGroup: 53 
+      containers:
+        - name: bind9
+          image: internetsystemsconsortium/bind9:9.20
+          ports:
+            - name: dns-tcp
+              containerPort: 53
+              protocol: TCP
+            - name: dns-udp
+              containerPort: 53
+              protocol: UDP
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          volumeMounts:
+            - name: bind-config
+              mountPath: /etc/bind/named.conf
+              subPath: named.conf
+            - name: rndc-key
+              mountPath: /etc/bind/rndc.key
+              subPath: rndc.key
+            - name: iscdlvkey-config
+              mountPath: /etc/bind/named.iscdlv.key                                         
+              subPath: named.iscdlv.key
+            - name: rootkey-config
+              mountPath: /etc/bind/named.root.key                                  
+              subPath: named.root.key
+            - name: rfczone-config
+              mountPath: /etc/bind/named.rfc1912.zones
+              subPath: named.rfc1912.zones
+            - name: var-bind
+              mountPath: /var/named
+            - name: log-bind
+              mountPath: /var/log
+      volumes:
+      - name: bind-config
+        configMap:
+          name: bind-config
+      - name: rndc-key
+        configMap:
+          name: rndc-key
+      - name: iscdlvkey-config
+        configMap:
+          name: iscdlvkey-config
+      - name: rootkey-config
+        configMap:
+          name: rootkey-config
+      - name: rfczone-config
+        configMap:
+          name: rfczone-config
+      - name: var-bind
+        persistentVolumeClaim:
+          claimName: var-named-pvc
+      - name: log-bind
+        persistentVolumeClaim:
+          claimName: log-bind-pvc

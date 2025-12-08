@@ -1,0 +1,11 @@
+---
+# -----------------------------------------------------------
+# Namespace (enable Istio sidecar or ambient injection)
+# -----------------------------------------------------------
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: nextcloud
+  labels:
+    istio.io/dataplane-mode: ambient    # for ambient mesh
+    istio-injection: enabled             # fallback if ambient disabled

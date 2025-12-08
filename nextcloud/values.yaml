@@ -1,0 +1,108 @@
+# values.yaml for Nextcloud Helm chart
+image:
+  repository: nextcloud
+  tag: 32.0.0-fpm
+  pullPolicy: IfNotPresent
+
+ingress:
+  enabled: false  # Istio handles ingress
+  className: ""
+  annotations: {}
+  hosts: []
+  tls: []
+
+service:
+  type: ClusterIP
+  port: 80
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: 1
+    memory: 1Gi
+
+persistence:
+  enabled: true
+  storageClass: rook-ceph-retain
+  accessMode: ReadWriteOnce
+  size: 20Gi
+
+nextcloud:
+  host: nextcloud.ghosthacker.dev
+  username: admin
+  password: "changeme"
+  update: 0
+  datadir: /var/www/html/data
+  extraEnv:
+    - name: OVERWRITEPROTOCOL
+      value: https
+    - name: OVERWRITECLIURL
+      value: https://nextcloud.ghosthacker.dev
+    - name: TRUSTED_PROXIES
+      value: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+
+internalDatabase:
+  enabled: false
+
+externalDatabase:
+  enabled: true
+  type: postgresql
+  host: nextcloud-db-rw.nextcloud.svc.cluster.local
+  database: nextcloud
+  user: nextcloud
+  existingSecret:
+    name: nextcloud-db-secret
+    key: password
+
+redis:
+  enabled: true
+  architecture: standalone
+  auth:
+    enabled: false
+
+metrics:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 120
+  periodSeconds: 20
+  timeoutSeconds: 10
+  failureThreshold: 6
+  path: /status.php
+  port: http
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 90
+  periodSeconds: 15
+  timeoutSeconds: 10
+  failureThreshold: 6
+  path: /status.php
+  port: http
+
+startupProbe:
+  enabled: true
+  path: /status.php
+  port: http
+  initialDelaySeconds: 60
+  failureThreshold: 30
+  periodSeconds: 10
+
+
+# Optional: PVC for app data if you want persistent /config
+extraVolumes: []
+extraVolumeMounts: []
+
+podAnnotations:
+  proxy.istio.io/config: |
+    statusPort: 15020
+    readinessInitialDelaySeconds: 10
+    holdApplicationUntilProxyStarts: true
+  sidecar.istio.io/inject: "true"
+  readiness.status.sidecar.istio.io/excludeOutboundPorts: "80"
+

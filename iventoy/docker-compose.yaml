@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  iventoy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: harbor.ghosthackeer.com/iventoy:latest
+    container_name: iventoy
+    privileged: true
+    network_mode: host       # so ports 69 etc. work on LAN
+    ports:
+      - "69:69/udp"
+      - "26000:26000/tcp"
+      - "16000:16000/tcp"
+      - "10809:10809/tcp"
+    volumes:
+      - ./isos:/iventoy/iso
+      - ./data:/iventoy/data
+      - ./log:/iventoy/log
+    restart: unless-stopped

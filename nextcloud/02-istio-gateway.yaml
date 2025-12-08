@@ -1,0 +1,58 @@
+---
+# -----------------------------------------------------------
+# Istio Gateway (must reside in istio-system)
+# -----------------------------------------------------------
+apiVersion: networking.istio.io/v1beta1
+kind: Gateway
+metadata:
+  name: nextcloud-gateway
+  namespace: istio-system
+spec:
+  selector:
+    istio: ingressgateway    # match default Istio ingress gateway
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "nextcloud.ghosthacker.dev"
+      tls:
+        httpsRedirect: true   # redirect HTTP → HTTPS
+    - port:
+        number: 443
+        name: https
+        protocol: HTTPS
+      tls:
+        mode: SIMPLE
+        credentialName: nextcloud-tls-secret   # Secret in istio-system
+      hosts:
+        - "nextcloud.ghosthacker.dev"
+
+---
+# -----------------------------------------------------------
+# Istio VirtualService (routes external traffic to Nextcloud)
+# -----------------------------------------------------------
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: nextcloud
+  namespace: nextcloud
+spec:
+  hosts:
+    - "nextcloud.ghosthacker.dev"
+  gateways:
+    - istio-system/nextcloud-gateway
+  http:
+    - match:
+        - uri:
+            prefix: /
+      route:
+        - destination:
+            host: nextcloud
+            port:
+              number: 80
+      headers:
+        response:
+          add:
+            Strict-Transport-Security: "max-age=31536000; includeSubDomains"

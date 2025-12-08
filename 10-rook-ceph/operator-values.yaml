@@ -1,0 +1,58 @@
+# Rook Operator values.yaml for small (8GB RAM) clusters
+
+image:
+  repository: rook/ceph
+  tag: v1.18.2
+  pullPolicy: IfNotPresent
+
+crds:
+  enabled: true
+
+csi:
+  enableRbdDriver: true
+  enableCephfsDriver: true
+  enableGrpcMetrics: true
+  provisionerReplicas: 1   # reduce from 2 to save memory
+  pluginUpdateStrategy: RollingUpdate
+
+  # Sidecar tuning for smaller nodes
+  rbdProvisionerResource:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  cephFSProvisionerResource:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  rbdPluginResource:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+  cephFSPluginResource:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 200m
+      memory: 256Mi
+
+monitoring:
+  enabled: false   # disable Prometheus exporter for now (saves RAM)
+
+# Operator pod itself
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    cpu: 300m
+    memory: 512Mi

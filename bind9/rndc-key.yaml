@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rndc-key
+  namespace: bind9
+data:
+  rndc.key: |
+    key "rndc-key" {
+        algorithm hmac-md5;
+        secret "L08gYTN3anlWlwhZVTwnRA==";   # 👈 use the same secret you already have in named.conf
+    };

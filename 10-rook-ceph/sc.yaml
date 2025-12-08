@@ -1,0 +1,23 @@
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    meta.helm.sh/release-name: rook-ceph-cluster
+    meta.helm.sh/release-namespace: rook-ceph
+    storageclass.kubernetes.io/is-default-class: "true"
+  creationTimestamp: "2025-09-18T22:44:25Z"
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  name: rook-ceph-block
+  resourceVersion: "30778"
+  uid: d81bd9d7-957d-423d-958c-adb74d7cb5eb
+parameters:
+  clusterID: rook-ceph
+  csi.storage.k8s.io/fstype: ext4
+  imageFeatures: layering
+  imageFormat: "2"
+  pool: replicapool
+provisioner: rook-ceph.rbd.csi.ceph.com
+reclaimPolicy: Delete
+volumeBindingMode: Immediate

@@ -1,0 +1,98 @@
+# Rook Ceph Cluster values.yaml for 8GB RAM worker nodes
+
+operatorNamespace: rook-ceph
+
+cephClusterSpec:
+  cephVersion:
+    image: quay.io/ceph/ceph:v19.2.3
+    allowUnsupported: false
+
+  dataDirHostPath: /var/lib/rook
+
+  mon:
+    count: 3
+    allowMultiplePerNode: false
+
+  mgr:
+    count: 1   # reduced to save RAM
+
+  dashboard:
+    enabled: true
+    ssl: false
+
+  monitoring:
+    enabled: false   # disable to save resources
+
+  network:
+    hostNetwork: false
+
+  storage:
+    useAllNodes: false
+    useAllDevices: false
+    nodes:
+      - name: nodepool-01a
+        devices:
+          - name: nvme0n1
+      - name: nodepool-01b
+        devices:
+          - name: nvme0n1
+      - name: nodepool-01c
+        devices:
+          - name: nvme0n1
+      - name: nodepool-01d
+        devices:
+          - name: nvme0n1
+      - name: nodepool-01e
+        devices:
+          - name: nvme0n1
+
+    config:
+      osdsPerDevice: "1"
+      databaseSizeMB: "0"
+      walSizeMB: "0"
+      storeType: bluestore
+
+  resources:
+    mon:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+    osd:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: "1"
+        memory: 2Gi
+    mgr:
+      requests:
+        cpu: 200m
+        memory: 512Mi
+      limits:
+        cpu: 500m
+        memory: 1Gi
+
+toolbox:
+  enabled: true
+
+cephBlockPools:
+  - name: replicapool
+    spec:
+      failureDomain: host
+      replicated:
+        size: 3
+    storageClass:
+      enabled: true
+      name: rook-ceph-block
+      reclaimPolicy: Delete
+      allowVolumeExpansion: true
+      parameters:
+        imageFormat: "2"
+        imageFeatures: layering
+        csi.storage.k8s.io/fstype: ext4
+
+cephFileSystems: []
+cephObjectStores: []

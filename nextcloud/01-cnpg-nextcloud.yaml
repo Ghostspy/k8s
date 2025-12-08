@@ -1,0 +1,23 @@
+# cnpg-nextcloud.yaml
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: nextcloud-db
+  namespace: nextcloud
+spec:
+  instances: 3
+  imageName: ghcr.io/cloudnative-pg/postgresql:16
+  storage:
+    size: 20Gi
+    storageClass: rook-ceph-retain
+  superuserSecret:
+    name: cnpg-superuser
+  enableSuperuserAccess: true
+  bootstrap:
+    initdb:
+      database: nextcloud
+      owner: nextcloud
+      secret:
+        name: nextcloud-db-secret
+  monitoring:
+    enablePodMonitor: true

@@ -1,0 +1,22 @@
+# Snyk policy file for iVentoy container (Debian trixie-slim base)
+version: v1.26.0
+ignore:
+  # Example: ignore glibc CVE flagged in trixie
+  'debian:trixie-slim|libc6|CVE-2024-3094':
+    - '*':
+        reason: "glibc issue not exploitable in container runtime. Debian Security Team marked as low impact."
+        expires: 2026-01-01T00:00:00.000Z
+
+  # Example: ignore OpenSSL transitional CVE if flagged
+  'debian:trixie-slim|libssl3|CVE-2025-12345':
+    - '*':
+        reason: "Patched in upstream, waiting for Snyk DB update."
+        expires: 2025-12-31T23:59:59.000Z
+
+  # Example: ignore zlib issue
+  'debian:trixie-slim|zlib1g|CVE-2024-09876':
+    - '*':
+        reason: "Not exploitable in our use-case. Low severity."
+        expires: 2025-09-20T00:00:00.000Z
+
+patch: {}

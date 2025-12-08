@@ -1,0 +1,17 @@
+# Ignore all "configs" directories anywhere in the repo
+**/configs/
+
+# Common Kubernetes-related ignores
+*.yaml~           # editor backup files
+*.yml~            # editor backup files
+*.log             # log files
+*.tmp             # temp files
+*.swp             # vi/vim swap files
+.DS_Store         # macOS metadata
+.idea/            # JetBrains IDE config
+.vscode/          # VS Code config
+.env              # local env files (don’t commit secrets)
+
+# Bind9 runtime logs - do not track
+bind9/configs/var/named/data/named.run
+bind9/configs/var/named/data/named.run-*
