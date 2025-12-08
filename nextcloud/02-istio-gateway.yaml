@@ -6,28 +6,31 @@ apiVersion: networking.istio.io/v1beta1
 kind: Gateway
 metadata:
   name: nextcloud-gateway
-  namespace: istio-system
+  namespace: istio-system           # same ns as your ingressgateway
 spec:
   selector:
-    istio: ingressgateway    # match default Istio ingress gateway
+    istio: ingressgateway           # MUST match labels on istio-ingressgateway
+    # e.g. if your deployment labels it as:
+    #   app: istio-ingressgateway
+    # then use:
+    # selector:
+    #   app: istio-ingressgateway
   servers:
     - port:
         number: 80
         name: http
         protocol: HTTP
       hosts:
-        - "nextcloud.ghosthacker.dev"
-      tls:
-        httpsRedirect: true   # redirect HTTP → HTTPS
+        - nextcloud.ghosthacker.dev     # change to your actual FQDN
     - port:
         number: 443
         name: https
         protocol: HTTPS
       tls:
         mode: SIMPLE
-        credentialName: nextcloud-tls-secret   # Secret in istio-system
+        credentialName: nextcloud-tls   # name of a Secret with TLS cert
       hosts:
-        - "nextcloud.ghosthacker.dev"
+        - nextcloud.ghosthacker.dev     # same host as above
 
 ---
 # -----------------------------------------------------------
@@ -37,22 +40,28 @@ apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
   name: nextcloud
-  namespace: nextcloud
+  namespace: nextcloud               # tie it to same ns as the Service
 spec:
   hosts:
-    - "nextcloud.ghosthacker.dev"
+    - nextcloud.ghosthacker.dev      # same host as Gateway
   gateways:
     - istio-system/nextcloud-gateway
   http:
+    # Redirect all plain HTTP to HTTPS
     - match:
-        - uri:
-            prefix: /
+        - port: 80
+      redirect:
+        scheme: https
+        port: 443
+        redirectCode: 308
+
+    # Main HTTPS route
+    - match:
+        - port: 443
       route:
         - destination:
-            host: nextcloud
+            host: nextcloud.nextcloud.svc.cluster.local  # service FQDN
             port:
               number: 80
-      headers:
-        response:
-          add:
-            Strict-Transport-Security: "max-age=31536000; includeSubDomains"
+      # Optional: if you ever run Nextcloud under a subpath (e.g. /nextcloud),
+      # you can add rewrite rules here, but for root deployment this is fine.

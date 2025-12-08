@@ -2,7 +2,7 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-helm_chart_version="8.0.1"
+helm_chart_version="8.6.0"
 
 # dump out the applied YAML so it's saved as an artifact
 touch nextcloud-helm-template.yaml

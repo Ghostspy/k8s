@@ -58,7 +58,11 @@ externalDatabase:
 
 redis:
   enabled: true
-  architecture: standalone
+  image:
+    repository: redis
+    tag: 8.0.5-bookworm # Example, use a specific version for stability
+    pullPolicy: IfNotPresent
+    architecture: standalone
   auth:
     enabled: false
 
@@ -97,12 +101,3 @@ startupProbe:
 # Optional: PVC for app data if you want persistent /config
 extraVolumes: []
 extraVolumeMounts: []
-
-podAnnotations:
-  proxy.istio.io/config: |
-    statusPort: 15020
-    readinessInitialDelaySeconds: 10
-    holdApplicationUntilProxyStarts: true
-  sidecar.istio.io/inject: "true"
-  readiness.status.sidecar.istio.io/excludeOutboundPorts: "80"
-
