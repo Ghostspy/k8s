@@ -1,7 +1,8 @@
 # values.yaml for Nextcloud Helm chart
 image:
+image:
   repository: nextcloud
-  tag: 32.0.0-fpm
+  tag: 32.0.0-apache
   pullPolicy: IfNotPresent
 
 ingress:
@@ -14,6 +15,13 @@ ingress:
 service:
   type: ClusterIP
   port: 80
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+    - name: https
+      port: 443
+      targetPort: https      
 
 resources:
   requests:

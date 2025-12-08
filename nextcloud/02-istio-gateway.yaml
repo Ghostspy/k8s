@@ -65,3 +65,17 @@ spec:
               number: 80
       # Optional: if you ever run Nextcloud under a subpath (e.g. /nextcloud),
       # you can add rewrite rules here, but for root deployment this is fine.
+
+---
+# -----------------------------------------------------------
+# Create istio waypoint for Nextcloud namespace
+# -----------------------------------------------------------
+apiVersion: gateway.networking.k8s.io/v1
+kind: Waypoint
+metadata:
+  name: nextcloud-waypoint
+  namespace: nextcloud
+spec:
+  workloadSelector:
+    labels:
+      app.kubernetes.io/name: nextcloud

@@ -127,7 +127,7 @@ type: Opaque
 data:
   nextcloud-username: "YWRtaW4="
   nextcloud-password: "Y2hhbmdlbWU="
-  nextcloud-token: "UDRlSHdtOHVXVg=="
+  nextcloud-token: "Szhrem9OV0FQcg=="
 ---
 # Source: nextcloud/charts/redis/templates/configmap.yaml
 apiVersion: v1
@@ -541,7 +541,7 @@ spec:
     spec:
       containers:
         - name: nextcloud
-          image: docker.io/nextcloud:32.0.0-fpm
+          image: docker.io/nextcloud:32.0.0-apache
           imagePullPolicy: IfNotPresent
           env:
             
