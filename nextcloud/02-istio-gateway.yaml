@@ -1,81 +1,55 @@
----
-# -----------------------------------------------------------
-# Istio Gateway (must reside in istio-system)
-# -----------------------------------------------------------
 apiVersion: networking.istio.io/v1beta1
 kind: Gateway
 metadata:
   name: nextcloud-gateway
-  namespace: istio-system           # same ns as your ingressgateway
+  namespace: istio-system
 spec:
   selector:
-    istio: ingressgateway           # MUST match labels on istio-ingressgateway
-    # e.g. if your deployment labels it as:
-    #   app: istio-ingressgateway
-    # then use:
-    # selector:
-    #   app: istio-ingressgateway
+    istio: ingressgateway    # matches your istio-ingressgateway Service/Deployment label
   servers:
     - port:
         number: 80
         name: http
         protocol: HTTP
       hosts:
-        - nextcloud.ghosthacker.dev     # change to your actual FQDN
+        - nextcloud.ghosthacker.dev
+      tls:
+        httpsRedirect: true
     - port:
         number: 443
         name: https
         protocol: HTTPS
+      hosts:
+        - nextcloud.ghosthacker.dev
       tls:
         mode: SIMPLE
-        credentialName: nextcloud-tls   # name of a Secret with TLS cert
-      hosts:
-        - nextcloud.ghosthacker.dev     # same host as above
-
+        credentialName: nextcloud-tls   # Kubernetes TLS secret in istio-system
 ---
-# -----------------------------------------------------------
-# Istio VirtualService (routes external traffic to Nextcloud)
-# -----------------------------------------------------------
 apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata:
   name: nextcloud
-  namespace: nextcloud               # tie it to same ns as the Service
+  namespace: nextcloud
 spec:
   hosts:
-    - nextcloud.ghosthacker.dev      # same host as Gateway
+    - nextcloud.ghosthacker.dev
   gateways:
     - istio-system/nextcloud-gateway
   http:
-    # Redirect all plain HTTP to HTTPS
     - match:
-        - port: 80
-      redirect:
-        scheme: https
-        port: 443
-        redirectCode: 308
-
-    # Main HTTPS route
-    - match:
-        - port: 443
+        - uri:
+            prefix: /
       route:
         - destination:
-            host: nextcloud.nextcloud.svc.cluster.local  # service FQDN
+            host: nextcloud.nextcloud.svc.cluster.local
             port:
               number: 80
-      # Optional: if you ever run Nextcloud under a subpath (e.g. /nextcloud),
-      # you can add rewrite rules here, but for root deployment this is fine.
-
----
-# -----------------------------------------------------------
-# Create istio waypoint for Nextcloud namespace
-# -----------------------------------------------------------
-apiVersion: gateway.networking.k8s.io/v1
-kind: Waypoint
-metadata:
-  name: nextcloud-waypoint
-  namespace: nextcloud
-spec:
-  workloadSelector:
-    labels:
-      app.kubernetes.io/name: nextcloud
+      timeout: 600s
+      retries:
+        attempts: 3
+        perTryTimeout: 30s
+        retryOn: gateway-error,connect-failure,refused-stream
+      headers:
+        request:
+          add:
+            X-Forwarded-Proto: "https"

@@ -1,4 +1,15 @@
 # cnpg-nextcloud.yaml
+apiVersion: v1
+kind: Secret
+metadata:
+  name: nextcloud-db-secret
+  namespace: nextcloud
+type: Opaque
+stringData:
+  username: nextcloud
+  password: 21aztec5
+
+---
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:

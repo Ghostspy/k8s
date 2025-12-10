@@ -96,22 +96,6 @@ metadata:
     app.kubernetes.io/version: 8.0.1
     helm.sh/chart: redis-21.1.3
 ---
-# Source: nextcloud/templates/db-secret.yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: nextcloud-db
-  labels:
-    app.kubernetes.io/name: nextcloud
-    app.kubernetes.io/instance: nextcloud
-    helm.sh/chart: nextcloud-8.6.0
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "32.0.2"
-type: Opaque
-data:
-  db-username: "bmV4dGNsb3Vk"
-  db-password: ""
----
 # Source: nextcloud/templates/secrets.yaml
 apiVersion: v1
 kind: Secret
@@ -127,7 +111,6 @@ type: Opaque
 data:
   nextcloud-username: "YWRtaW4="
   nextcloud-password: "Y2hhbmdlbWU="
-  nextcloud-token: "Szhrem9OV0FQcg=="
 ---
 # Source: nextcloud/charts/redis/templates/configmap.yaml
 apiVersion: v1
@@ -298,7 +281,8 @@ data:
         cp /opt/bitnami/redis/mounted-etc/users.acl /opt/bitnami/redis/etc/users.acl
     fi
     ARGS=("--port" "${REDIS_PORT}")
-    ARGS+=("--protected-mode" "no")
+    ARGS+=("--requirepass" "${REDIS_PASSWORD}")
+    ARGS+=("--masterauth" "${REDIS_PASSWORD}")
     ARGS+=("--include" "/opt/bitnami/redis/etc/redis.conf")
     ARGS+=("--include" "/opt/bitnami/redis/etc/master.conf")
     exec redis-server "${ARGS[@]}"
@@ -352,7 +336,8 @@ data:
     echo "replica-announce-ip $(get_full_hostname "$HOSTNAME")" >> /opt/bitnami/redis/etc/replica.conf
     ARGS=("--port" "${REDIS_PORT}")
     ARGS+=("--replicaof" "${REDIS_MASTER_HOST}" "${REDIS_MASTER_PORT_NUMBER}")
-    ARGS+=("--protected-mode" "no")
+    ARGS+=("--requirepass" "${REDIS_PASSWORD}")
+    ARGS+=("--masterauth" "${REDIS_MASTER_PASSWORD}")
     ARGS+=("--include" "/opt/bitnami/redis/etc/redis.conf")
     ARGS+=("--include" "/opt/bitnami/redis/etc/replica.conf")
     exec redis-server "${ARGS[@]}"
@@ -376,7 +361,7 @@ spec:
     - "ReadWriteOnce"
   resources:
     requests:
-      storage: "20Gi"
+      storage: "50Gi"
   storageClassName: "rook-ceph-retain"
 ---
 # Source: nextcloud/charts/redis/templates/headless-svc.yaml
@@ -456,32 +441,6 @@ spec:
     app.kubernetes.io/name: redis
     app.kubernetes.io/component: replica
 ---
-# Source: nextcloud/templates/metrics/service.yaml
-apiVersion: v1
-kind: Service
-metadata:
-  name: nextcloud-metrics
-  labels:
-    app.kubernetes.io/name: nextcloud
-    app.kubernetes.io/instance: nextcloud
-    app.kubernetes.io/component: metrics
-    helm.sh/chart: nextcloud-8.6.0
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "32.0.2"
-  annotations:
-    prometheus.io/port: "9205"
-    prometheus.io/scrape: "true"
-spec:
-  type: ClusterIP
-  ports:
-    - name: metrics
-      port: 9205
-      targetPort: metrics
-  selector:
-    app.kubernetes.io/name: nextcloud
-    app.kubernetes.io/instance: nextcloud
-    app.kubernetes.io/component: metrics
----
 # Source: nextcloud/templates/service.yaml
 apiVersion: v1
 kind: Service
@@ -497,7 +456,7 @@ metadata:
 spec:
   type: ClusterIP
   ports:
-    - port: 80
+    - port: 8080
       targetPort: 80
       protocol: TCP
       name: http
@@ -534,31 +493,21 @@ spec:
         app.kubernetes.io/instance: nextcloud
         app.kubernetes.io/component: app
         nextcloud-redis-client: "true"
+        istio-injection: enabled
       annotations:
         nextcloud-config-hash: 8266a725d5474acb6adbf9f0609a3494dc3340a3ac306db90eac9ddb1b851960
         php-config-hash: 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a
         hooks-hash: 9525c2748a6c7cd0e28ec740623d0b3fa5a75c83b51ccfd136bc89c76737b204
+        sidecar.istio.io/inject: "true"
     spec:
       containers:
         - name: nextcloud
-          image: docker.io/nextcloud:32.0.0-apache
+          image: docker.io/library/nextcloud:32.0.2-apache
           imagePullPolicy: IfNotPresent
           env:
             
-            - name: POSTGRES_HOST
-              value: "nextcloud-db-rw.nextcloud.svc.cluster.local"
-            - name: POSTGRES_DB
+            - name: SQLITE_DATABASE
               value: "nextcloud"
-            - name: POSTGRES_USER
-              valueFrom:
-                secretKeyRef:
-                  name: nextcloud-db
-                  key: db-username
-            - name: POSTGRES_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: nextcloud-db
-                  key: db-password
             - name: NEXTCLOUD_ADMIN_USER
               valueFrom:
                 secretKeyRef:
@@ -570,7 +519,7 @@ spec:
                   name: nextcloud
                   key: nextcloud-password
             - name: NEXTCLOUD_TRUSTED_DOMAINS
-              value: nextcloud.ghosthacker.dev nextcloud.nextcloud.svc.cluster.local
+              value: nextcloud.ghosthacker.dev
             - name: NEXTCLOUD_DATA_DIR
               value: "/var/www/html/data"
             
@@ -578,20 +527,19 @@ spec:
               value: nextcloud-redis-master
             - name: REDIS_HOST_PORT
               value: "6379"
+            - name: REDIS_HOST_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: nextcloud-redis-secret
+                  key: redis-password
             
             
-            - name: OVERWRITEPROTOCOL
-              value: https
-            - name: OVERWRITECLIURL
-              value: https://nextcloud.ghosthacker.dev
-            - name: TRUSTED_PROXIES
-              value: 10.0.0.0/8,172.16.0.0/12,192.168.0.0/16
           resources:
             limits:
-              cpu: 1
-              memory: 1Gi
+              cpu: 2
+              memory: 4Gi
             requests:
-              cpu: 250m
+              cpu: 100m
               memory: 512Mi
           volumeMounts:
             - name: nextcloud-main
@@ -626,11 +574,11 @@ spec:
               httpHeaders:
               - name: Host
                 value: "nextcloud.ghosthacker.dev"
-            initialDelaySeconds: 120
-            periodSeconds: 20
-            timeoutSeconds: 10
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
             successThreshold: 1
-            failureThreshold: 6
+            failureThreshold: 3
           readinessProbe:
             httpGet:
               path: /status.php
@@ -638,23 +586,11 @@ spec:
               httpHeaders:
               - name: Host
                 value: "nextcloud.ghosthacker.dev"
-            initialDelaySeconds: 90
-            periodSeconds: 15
-            timeoutSeconds: 10
-            successThreshold: 1
-            failureThreshold: 6
-          startupProbe:
-            httpGet:
-              path: /status.php
-              port:  80
-              httpHeaders:
-              - name: Host
-                value: "nextcloud.ghosthacker.dev"
-            initialDelaySeconds: 60
+            initialDelaySeconds: 10
             periodSeconds: 10
             timeoutSeconds: 5
             successThreshold: 1
-            failureThreshold: 30
+            failureThreshold: 3
       volumes:
         - name: nextcloud-main
           persistentVolumeClaim:
@@ -662,67 +598,6 @@ spec:
       securityContext:
         # Will mount configuration files as www-data (id: 33) for nextcloud
         fsGroup: 33
----
-# Source: nextcloud/templates/metrics/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: nextcloud-metrics
-  labels:
-    app.kubernetes.io/name: nextcloud
-    app.kubernetes.io/instance: nextcloud
-    app.kubernetes.io/component: metrics
-    helm.sh/chart: nextcloud-8.6.0
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "32.0.2"
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: nextcloud
-      app.kubernetes.io/instance: nextcloud
-      app.kubernetes.io/component: metrics
-  template:
-    metadata:
-      annotations:
-        {}
-      labels:
-        app.kubernetes.io/name: nextcloud
-        app.kubernetes.io/instance: nextcloud
-        app.kubernetes.io/component: metrics
-    spec:
-      containers:
-        - name: metrics-exporter
-          image: "docker.io/xperimental/nextcloud-exporter:0.8.0"
-          imagePullPolicy: IfNotPresent
-          env:
-            - name: NEXTCLOUD_USERNAME
-              valueFrom:
-                secretKeyRef:
-                  name: nextcloud
-                  key: nextcloud-username
-            - name: NEXTCLOUD_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: nextcloud
-                  key: nextcloud-password
-            # NEXTCLOUD_SERVER is used by metrics-exporter to reach the Nextcloud (K8s-)Service to grab the serverinfo api endpoint
-            - name: NEXTCLOUD_SERVER # deployment.namespace.svc.cluster.local
-              value: "http://nextcloud.nextcloud.svc.cluster.local:80"
-            - name: NEXTCLOUD_TIMEOUT
-              value: 5s
-            - name: NEXTCLOUD_TLS_SKIP_VERIFY
-              value: "false"
-            - name: NEXTCLOUD_INFO_APPS
-              value: "false"
-            - name: NEXTCLOUD_INFO_UPDATE
-              value: "false"
-          ports:
-            - name: metrics
-              containerPort: 9205
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
 ---
 # Source: nextcloud/charts/redis/templates/master/application.yaml
 apiVersion: apps/v1
@@ -760,7 +635,7 @@ spec:
       annotations:
         checksum/configmap: 2a9ab4a5432825504d910f022638674ce88eaefe9f9f595ad8bc107377d104fb
         checksum/health: aff24913d801436ea469d8d374b2ddb3ec4c43ee7ab24663d5f8ff1a1b6991a9
-        checksum/scripts: d0ab1e3b7f7ece1ac62b395d3c4e9aa1bfba0aeb3b9d958167382bd30aea1e32
+        checksum/scripts: 06cff14d6838208d327ef535f52575d95d4cbf252fb6a70f45b54f62c57afe03
         checksum/secret: 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a
     spec:
       
@@ -815,7 +690,9 @@ spec:
             - name: REDIS_REPLICATION_MODE
               value: master
             - name: ALLOW_EMPTY_PASSWORD
-              value: "yes"
+              value: "no"
+            - name: REDIS_PASSWORD_FILE
+              value: "/opt/bitnami/redis/secrets/redis-password"
             - name: REDIS_TLS_ENABLED
               value: "no"
             - name: REDIS_PORT
@@ -860,6 +737,8 @@ spec:
               mountPath: /opt/bitnami/scripts/start-scripts
             - name: health
               mountPath: /health
+            - name: redis-password
+              mountPath: /opt/bitnami/redis/secrets/
             - name: redis-data
               mountPath: /data
             - name: config
@@ -879,6 +758,13 @@ spec:
           configMap:
             name: nextcloud-redis-health
             defaultMode: 0755
+        - name: redis-password
+          
+          secret:
+            secretName: nextcloud-redis-secret
+            items:
+            - key: redis-password
+              path: redis-password
         - name: config
           configMap:
             name: nextcloud-redis-configuration
@@ -936,7 +822,7 @@ spec:
       annotations:
         checksum/configmap: 2a9ab4a5432825504d910f022638674ce88eaefe9f9f595ad8bc107377d104fb
         checksum/health: aff24913d801436ea469d8d374b2ddb3ec4c43ee7ab24663d5f8ff1a1b6991a9
-        checksum/scripts: d0ab1e3b7f7ece1ac62b395d3c4e9aa1bfba0aeb3b9d958167382bd30aea1e32
+        checksum/scripts: 06cff14d6838208d327ef535f52575d95d4cbf252fb6a70f45b54f62c57afe03
         checksum/secret: 44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a
     spec:
       
@@ -995,7 +881,11 @@ spec:
             - name: REDIS_MASTER_PORT_NUMBER
               value: "6379"
             - name: ALLOW_EMPTY_PASSWORD
-              value: "yes"
+              value: "no"
+            - name: REDIS_PASSWORD_FILE
+              value: "/opt/bitnami/redis/secrets/redis-password"
+            - name: REDIS_MASTER_PASSWORD_FILE
+              value: "/opt/bitnami/redis/secrets/redis-password"
             - name: REDIS_TLS_ENABLED
               value: "no"
             - name: REDIS_PORT
@@ -1047,6 +937,8 @@ spec:
               mountPath: /opt/bitnami/scripts/start-scripts
             - name: health
               mountPath: /health
+            - name: redis-password
+              mountPath: /opt/bitnami/redis/secrets/
             - name: redis-data
               mountPath: /data
             - name: config
@@ -1066,6 +958,13 @@ spec:
           configMap:
             name: nextcloud-redis-health
             defaultMode: 0755
+        - name: redis-password
+          
+          secret:
+            secretName: nextcloud-redis-secret
+            items:
+            - key: redis-password
+              path: redis-password
         - name: config
           configMap:
             name: nextcloud-redis-configuration
@@ -1086,31 +985,3 @@ spec:
         resources:
           requests:
             storage: "8Gi"
----
-# Source: nextcloud/templates/metrics/servicemonitor.yaml
-apiVersion: monitoring.coreos.com/v1
-kind: ServiceMonitor
-metadata:
-  name: nextcloud
-  namespace: "nextcloud"
-  labels:
-    app.kubernetes.io/name: nextcloud
-    app.kubernetes.io/instance: nextcloud
-    app.kubernetes.io/component: metrics
-    helm.sh/chart: nextcloud-8.6.0
-    app.kubernetes.io/managed-by: Helm
-    app.kubernetes.io/version: "32.0.2"
-spec:
-  jobLabel: ""
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: nextcloud
-      app.kubernetes.io/instance: nextcloud
-      app.kubernetes.io/component: metrics
-  namespaceSelector:
-    matchNames:
-      - "nextcloud"
-  endpoints:
-    - port: metrics
-      path: "/"
-      interval: 30s

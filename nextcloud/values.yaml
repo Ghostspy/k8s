@@ -1,111 +1,135 @@
-# values.yaml for Nextcloud Helm chart
-image:
-image:
-  repository: nextcloud
-  tag: 32.0.0-apache
-  pullPolicy: IfNotPresent
+##
+## Nextcloud Helm Values for Ghostspy Homelab
+## Kubernetes Domain: wyse.local
+## Istio Sidecar Mode + External CNPG + External Redis
+##
 
-ingress:
-  enabled: false  # Istio handles ingress
-  className: ""
-  annotations: {}
-  hosts: []
-  tls: []
+global:
+  clusterDomain: wyse.local
 
-service:
-  type: ClusterIP
-  port: 80
-  ports:
-    - name: http
-      port: 80
-      targetPort: http
-    - name: https
-      port: 443
-      targetPort: https      
 
-resources:
-  requests:
-    cpu: 250m
-    memory: 512Mi
-  limits:
-    cpu: 1
-    memory: 1Gi
-
-persistence:
-  enabled: true
-  storageClass: rook-ceph-retain
-  accessMode: ReadWriteOnce
-  size: 20Gi
-
+## ----------------------------------------------------------
+## NEXTCLOUD APPLICATION SETTINGS
+## ----------------------------------------------------------
 nextcloud:
-  host: nextcloud.ghosthacker.dev
-  username: admin
-  password: "changeme"
-  update: 0
-  datadir: /var/www/html/data
-  extraEnv:
-    - name: OVERWRITEPROTOCOL
-      value: https
-    - name: OVERWRITECLIURL
-      value: https://nextcloud.ghosthacker.dev
+  host: nextcloud.ghosthacker.dev       # <<< CHANGE TO YOUR PUBLIC FQDN
+  username: admin                       # Initial admin user (created on first boot)
+  password: changeme                    # CHANGE THIS
+  updateStrategy: RollingUpdate
+
+  ## Needed when behind Istio/Envoy
+  extraEnvVars:
     - name: TRUSTED_PROXIES
-      value: "10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+      value: "10.0.0.0/8,192.168.0.0/16,172.16.0.0/12"
+    - name: OVERWRITEHOST
+      value: "nextcloud.ghosthacker.dev"   # <<< CHANGE TO YOUR FQDN
+    - name: OVERWRITEPROTOCOL
+      value: "https"
+    - name: OVERWRITECLIURL
+      value: "https://nextcloud.ghosthacker.dev"
 
-internalDatabase:
-  enabled: false
-
+## ----------------------------------------------------------
+## EXTERNAL POSTGRESQL (CloudNativePG)
+## ----------------------------------------------------------
 externalDatabase:
   enabled: true
   type: postgresql
-  host: nextcloud-db-rw.nextcloud.svc.cluster.local
+  host: nextcloud-db-rw.nextcloud.svc.wyse.local
+  port: 5432
   database: nextcloud
-  user: nextcloud
-  existingSecret:
-    name: nextcloud-db-secret
-    key: password
 
+  existingSecret:
+    enabled: true
+    secretName: nextcloud-db-secret
+    usernameKey: username
+    passwordKey: password
+
+
+## ----------------------------------------------------------
+## EXTERNAL REDIS (Bitnami Redis recommended)
+## ----------------------------------------------------------
 redis:
   enabled: true
   image:
     repository: redis
     tag: 8.0.5-bookworm # Example, use a specific version for stability
     pullPolicy: IfNotPresent
-    architecture: standalone
   auth:
-    enabled: false
-
-metrics:
-  enabled: true
-  serviceMonitor:
     enabled: true
-
-livenessProbe:
+    existingSecret: nextcloud-redis-secret
+    existingSecretPasswordKey: redis-password    
+externalCache:
   enabled: true
-  initialDelaySeconds: 120
-  periodSeconds: 20
-  timeoutSeconds: 10
-  failureThreshold: 6
-  path: /status.php
-  port: http
+  type: redis
+  host: nextcloud-redis-master.nextcloud.svc.wyse.local
+  port: 6379
 
-readinessProbe:
+  existingSecret:
+    enabled: true
+    secretName: nextcloud-redis-secret
+    passwordKey: redis-password
+
+
+## ----------------------------------------------------------
+## PERSISTENCE SETTINGS
+## ----------------------------------------------------------
+persistence:
   enabled: true
-  initialDelaySeconds: 90
-  periodSeconds: 15
-  timeoutSeconds: 10
-  failureThreshold: 6
-  path: /status.php
-  port: http
-
-startupProbe:
-  enabled: true
-  path: /status.php
-  port: http
-  initialDelaySeconds: 60
-  failureThreshold: 30
-  periodSeconds: 10
+  storageClass: rook-ceph-retain
+  accessMode: ReadWriteOnce
+  size: 50Gi
 
 
-# Optional: PVC for app data if you want persistent /config
-extraVolumes: []
-extraVolumeMounts: []
+## ----------------------------------------------------------
+## ISTIO SIDECAR CONFIGURATION
+## ----------------------------------------------------------
+## Ensures the pod receives sidecar injection properly
+##
+podAnnotations:
+  sidecar.istio.io/inject: "true"
+
+##
+## Explicitly tell Envoy which ports to capture
+##
+podLabels:
+  istio-injection: enabled
+
+##
+## Override local DNS search domain so services resolve as
+## *.svc.wyse.local instead of *.svc.cluster.local
+##
+podDnsConfig:
+  options:
+    - name: local-search-domains
+      value: "wyse.local"
+
+dnsPolicy: ClusterFirst
+
+
+## ----------------------------------------------------------
+## INGRESS — DISABLED (handled by Istio Gateway)
+## ----------------------------------------------------------
+ingress:
+  enabled: false
+
+
+## ----------------------------------------------------------
+## RESOURCES + REPLICAS
+## ----------------------------------------------------------
+replicaCount: 1
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    cpu: 2
+    memory: 4Gi
+
+
+## ----------------------------------------------------------
+## APACHE CONFIG OVERRIDES (Required behind Envoy)
+## ----------------------------------------------------------
+apache:
+  extraConfigs: |
+    SetEnvIf X-Forwarded-Proto https HTTPS=on
